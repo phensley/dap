@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+
+import argparse, os, sys
+from collections import defaultdict, namedtuple
+
+ROOT = os.path.dirname(os.path.realpath(__file__))
+
+sys.path.insert(0, ROOT)
+
+from dap.limits import TokenBucket
+from dap.ftputil import FTP
+from dap.util import sizeof
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('-o', '--out', default=None,
+        help='Output directory')
+    p.add_argument('-r', '--rate', default=None, type=int,
+        help='Limit download rate, in KB per second')
+    p.add_argument('host',
+        help='Host to recursively calculate')
+    p.add_argument('path', default=['/'], nargs='*',
+        help='Root path')
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    ftp = FTP(args.host)
+
+    destroot = args.out
+    if destroot is None:
+        destroot = args.host.replace('.', '_')
+
+    limiter = None
+    if args.rate:
+        limiter = TokenBucket(args.rate * 1024)
+    for path in args.path:
+        ftp.download(path, destroot, limiter.consume)
+
+if __name__ == '__main__':
+    main()
+

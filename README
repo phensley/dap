@@ -1,0 +1,5 @@
+dap - scripts to assist with a digital archiving project
+
+* ftp_size - recursively calculate the size of an FTP site / folder
+* ftp_download - recursively download from an FTP size, with progress and rate limiting
+
