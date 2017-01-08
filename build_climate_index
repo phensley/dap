@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+
+# find all datasets and build a master index for later crawling
+# example query:
+# https://catalog.data.gov/api/action/package_search?q=organization:usgs-gov+AND+groups:climate5434&rows=1000
+
+import gzip, os, json, requests, sys, urllib
+from pprint import pprint
+
+BASE_URL = 'http://catalog.data.gov/api/3/action/package_search'
+HEADERS = {'Content-type': 'application/json'}
+
+ORGS = ['alcc-fws-gov', 'blm-gov', 'usgs-gov', 'epa-gov', 'fws-gov', 'hhs-gov',
+        'doc-gov', 'dhs-gov', 'doe-gov', 'doi-gov', 'nasa-gov', 'noaa-gov',
+        'fs-fed-us', 'usda-gov']
+
+
+def main():
+    master = []
+
+    # fetch a list of the available datasets in the climate group for
+    # each organization.
+    for org in ORGS:
+        # assume max of 1000 datasets per group
+        query = 'organization:%s AND groups:climate5434' % org
+        url = '%s?q=%s&rows=1000' % (BASE_URL, urllib.quote(query))
+
+        # query the api and append the results
+        req = requests.get(url)
+        res = req.json()
+        master.append({'org': org, 'response': res})
+
+    # write out compressed index
+    out = gzip.open('index.json.gz', 'wb')
+    json.dump(master, out, indent=2)
+    out.close()
+
+if __name__ == '__main__':
+    main()
+

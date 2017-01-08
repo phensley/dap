@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+import argparse, gzip, os, json, requests, sys, time
+import unicodecsv as csv
+
+
+def read_index(path):
+    stream = gzip.open(path, 'rb')
+    return json.load(stream)
+
+def main():
+    idx = read_index('index.json.gz')
+    groups = dict()
+    for rec in idx:
+
+        org = rec['org']
+        rows = []
+
+        for r in rec['response']['result']['results']:
+            for s in r['resources']:
+                try:
+                    fmt = s['format']
+                    name = s['name']
+                    if fmt:
+                        if name:
+                            fmt = name + ' / ' + fmt
+                    else:
+                        fmt = name
+
+                    rows.append(dict(
+                        org = org,
+                        title = r['title'],
+                        format = fmt,
+                        url = s['url']
+                    ))
+                except Exception, e:
+                    print e
+                    pprint(r)
+                    sys.exit()
+
+        groups[org] = rows
+
+    # generate a CSV file per organization
+    fields = ['org', 'title', 'format', 'url']
+    for org, rows in groups.iteritems():
+        out = csv.DictWriter(open('climate-%s.csv' % org, 'w'), fieldnames=fields)
+        out.writeheader()
+        for row in rows:
+            out.writerow(row)
+
+if __name__ == '__main__':
+    main()
+
