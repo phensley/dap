@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+import argparse, gzip, os, sys
+from collections import defaultdict
+from urlparse import urlparse
+
+# scan the frontier and aggregate counts for urls and path segments.
+# this can help generate patterns to prune out uninteresting urls,
+# to shorten crawl times.
+#
+# First, checkpoint your job, then run the script on the job's frontier
+# checkpoint recovery file:
+#
+#   scan-frontier -n 5 -s 2 <job>/20170109014502/logs/frontier.recover.gz.cp00001-20170112124211
+
+def process(path, segments=0):
+    hosts = defaultdict(int)
+    for line in gzip.open(path, 'rb'):
+        row = line.split()
+        if row[0] == 'T':
+            continue
+
+        url = row[1]
+        parts = urlparse(url)
+        if parts.scheme == 'dns':
+            continue
+
+        host = parts.hostname
+        if segments > 0:
+            path = parts.path.lstrip('/').split('/')
+            host += '/' + '/'.join(path[:segments])
+        hosts[host] += 1
+
+    it = sorted(((c, h) for h, c in hosts.iteritems()), reverse=True)
+    for count, host in it:
+        yield count, host
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('-s', '--segments', default=0, type=int,
+        help='Number of path segments to include')
+    p.add_argument('-n', '--number', default=10, type=int,
+        help='Top N to show')
+    p.add_argument('path', nargs='*',
+        help='Paths to process')
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    for path in args.path:
+        for i, row in enumerate(process(path, args.segments)):
+            if i == args.number:
+                break
+            count, host = row
+            print str(count).rjust(10), host
+
+if __name__ == '__main__':
+    main()
+
