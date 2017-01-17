@@ -8,23 +8,16 @@ from urlparse import urlparse
 # this can help generate patterns to prune out uninteresting urls,
 # to shorten crawl times.
 #
-# First, checkpoint your job, then run the script on the job's frontier
-# checkpoint recovery file:
-#
-#   scan-frontier -n 5 -s 2 <job>/20170109014502/logs/frontier.recover.gz.cp00001-20170112124211
+# 1. execute 'write-urls.groovy' script in job's script console
+#    changing the output path.
+# 2. run this script to aggregate the output.
+# 3. optionally run 'prune-frontier.groovy' to remove unwanted urls
 
 def process(path, segments=0):
     hosts = defaultdict(int)
-    for line in gzip.open(path, 'rb'):
-        row = line.split()
-        if row[0] == 'T':
-            continue
-
-        url = row[1]
+    for i, line in enumerate(open(path)):
+        url = line.split()[0]
         parts = urlparse(url)
-        if parts.scheme == 'dns':
-            continue
-
         host = parts.hostname
         if segments > 0:
             path = parts.path.lstrip('/').split('/')
