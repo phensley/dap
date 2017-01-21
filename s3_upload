@@ -80,8 +80,12 @@ def upload(path):
 
 
 def main():
-    for path in sys.argv[1:]:
+    paths = sys.argv[1:]
+    count = len(paths)
+    for path in paths:
         upload(path)
+        count -= 1
+        info('%d remaining..' % count)
 
 
 if __name__ == '__main__':
