@@ -1,0 +1,84 @@
+#!/usr/bin/env python
+
+# script i'm using to bulk-upload data archives to s3 and
+# perform md5 integrity check of upload. 
+#
+# usage:  s3_upload path [path]
+
+
+import base64, hashlib, json, os, sys, time
+from subprocess import Popen, PIPE
+
+
+# aws wrapper script to activate virtualenv
+AWS = '/data/crawl/aws'
+
+
+def info(m):
+    sys.stderr.write(m + '\n')
+    sys.stderr.flush()
+
+
+def md5_path(path):
+    with open(path, 'rb') as fh:
+        m = hashlib.md5()
+        while True:
+            data = fh.read(8192)
+            if not data:
+                break
+            m.update(data)
+        return base64.encodestring(m.digest()).strip()
+
+
+def run(cmd):
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    out, err = proc.communicate()
+    if proc.returncode != 0:
+        if not 'Not Found' in err:
+            info('cmd failed!   %s' % ' '.join(cmd))
+            info(err)
+        return {}
+    return json.loads(out.strip())
+
+
+def check(path):
+    info('checking %r' % path)
+    cmd = [AWS, 's3api', 'head-object', '--bucket', 'nrdc-data-archive',
+            '--key', path]
+    return run(cmd)
+
+
+def upload(path):
+    res = check(path)
+    if res:
+        return
+
+    start = time.time()
+    info('uploading %r' % path)
+    src_md5 = md5_path(path)
+    cmd = [AWS, 's3api', 'put-object', '--bucket', 'nrdc-data-archive',
+        '--key', path, '--body', path, '--metadata', 'md5chksum=%s' % src_md5,
+        '--content-md5', src_md5]
+    res = run(cmd)
+    if not res.get('ETag'):
+        info('upload failed!')
+        return
+
+    res = check(path)
+    dst_md5 = res.get('Metadata', {}).get('md5chksum', '')
+    if src_md5 != dst_md5:
+        info('verification of %r failed!  %s != %s' % (path, src_md5, dst_md5))
+    else:
+        info('upload %s succeeded!' % path)
+    elapsed = time.time() - start
+    info('elapsed: %.1f seconds' % elapsed)
+
+
+def main():
+    for path in sys.argv[1:]:
+        upload(path)
+
+
+if __name__ == '__main__':
+    main()
+
