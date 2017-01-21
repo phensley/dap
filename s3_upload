@@ -49,13 +49,18 @@ def check(path):
 
 
 def upload(path):
+    src_md5 = md5_path(path)
     res = check(path)
     if res:
-        return
+        dst_md5 = res.get('Metadata', {}).get('md5chksum', '')
+        if src_md5 == dst_md5:
+            info('md5 matches, skipping %r' % path)
+            return
+        info('md5 does not match, re-uploading %r' % path)
+    else:
+        info('uploading %r' % path)
 
     start = time.time()
-    info('uploading %r' % path)
-    src_md5 = md5_path(path)
     cmd = [AWS, 's3api', 'put-object', '--bucket', 'nrdc-data-archive',
         '--key', path, '--body', path, '--metadata', 'md5chksum=%s' % src_md5,
         '--content-md5', src_md5]
