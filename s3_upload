@@ -19,15 +19,16 @@ def info(m):
     sys.stderr.flush()
 
 
-def md5_path(path):
-    with open(path, 'rb') as fh:
-        m = hashlib.md5()
-        while True:
-            data = fh.read(8192)
-            if not data:
-                break
-            m.update(data)
-        return base64.encodestring(m.digest()).strip()
+def md5sum(path):
+    # use faster md5sum command
+    cmd = ['md5sum', path]
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    out, err = proc.communicate()
+    if proc.returncode != 0:
+        info('md5sum failed on %r' % path)
+        info(err)
+    m = out.split()[0].decode('hex')
+    return base64.encodestring(m).strip()
 
 
 def run(cmd):
@@ -49,7 +50,7 @@ def check(path):
 
 
 def upload(path):
-    src_md5 = md5_path(path)
+    src_md5 = md5sum(path)
     res = check(path)
     if res:
         dst_md5 = res.get('Metadata', {}).get('md5chksum', '')
